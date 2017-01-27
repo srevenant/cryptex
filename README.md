@@ -14,22 +14,19 @@ Install using python3 pip:
 
 Usage varies by what you want to do:
 
-Register an existing remote file with s3:
+Create a new secret file store named 'words' using s3
 >```
-    cryptex --config=NAME --remote=s3://key:secret@s3-bucket/filename --key=generate
+    cryptex --config=words --remote=s3://key:secret@s3-bucket/filename --key=generate
 ```
 
-View the latest file:
+View the latest copy of 'words':
 >```
-    cryptex NAME
+    cryptex words
 ```
 
-Edit the latest file:
+Edit the latest copy of 'words':
 >```
-    cryptex NAME --edit
-```
->```
-    cryptex NAME -e
+    cryptex words -e
 ```
 
 Also available are shortcuts: cx and vicx
