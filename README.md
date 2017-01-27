@@ -1,4 +1,6 @@
-**BETA**
+**ALPHA GRADE FOR THE MOMENT**
+
+> Originally written in python2, conversion to python3 broke some functionality, but mostly it is working.
 
 Cryptex manages secure documents for you, stored centrally, and versioned.
 
@@ -12,32 +14,9 @@ Install using python3 pip:
 
 Usage varies by what you want to do:
 
-Register an existing remote file:
+Register an existing remote file with s3:
 >```
-cryptex -c/--config=NAME [config args]
-```
-
-  [config args] are any of:
-    --key, --encoder, --versions, --remote, --seed
-
-Add a new file:
->```
-cryptex -c/--config=NAME -f/--file=FILE [config args]
-```
-
-See existing configuration:
->```
-cryptex -c/--config
-```
-
-List files:
->```
-cryptex -ls/--list
-```
-
-Delete a file:
->```
-cryptex --delete=NAME
+cryptex --config=NAME --remote=s3://key:secret@s3-bucket/filename --key=generate
 ```
 
 View the latest file:
@@ -45,26 +24,13 @@ View the latest file:
 cryptex NAME
 ```
 
-Search the latest file for MATCH:
->```
-cryptex NAME MATCH
-```
-
 Edit the latest file:
 >```
-cryptex NAME --e?dit
+cryptex NAME --edit
+
+cryptex NAME -e
 ```
 
-Other options:
-* --force      required for some actions
-* -d/--debug=m enable debuging of module (m), may be specified multiple times
-               modules: base, remoteFile, http
-* --encoder=x  specify an alternate encoder from gpg+vim.  None is acceptable.
-* --key=k      specify the key to use with the editor (such as the gpg key)
-* --version=v  specify a specific version to view (look at --ls)
-* --versions=x specify how many versions to keep with --add, default: 50
-* --remote=def specify the remote registry, format:
-                    s3://API_KEY:API_SECRET@BUCKET/PATH
 
 Also available are shortcuts: cx and vicx
 
