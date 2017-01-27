@@ -27,10 +27,10 @@ cryptex NAME
 Edit the latest file:
 >```
 cryptex NAME --edit
-
+```
+>```
 cryptex NAME -e
 ```
-
 
 Also available are shortcuts: cx and vicx
 
