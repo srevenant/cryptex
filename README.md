@@ -9,7 +9,7 @@ Think of it as a simpler form of one password, lastpass pwsafe and the like.
 Install using python3 pip:
 
 >```
-    pip install cryptex
+    pip3 install cryptex
 ```
 
 Usage varies by what you want to do:
