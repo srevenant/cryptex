@@ -1,7 +1,16 @@
 **BETA**
 
-Cryptex manages secure documents for you, stored centrally, and versioned
-It is used differently depending upon what you desire to do:
+Cryptex manages secure documents for you, stored centrally, and versioned.
+
+Think of it as a simpler form of one password, lastpass pwsafe and the like.
+
+Install using python3 pip:
+
+>```
+    pip install cryptex
+```
+
+Usage varies by what you want to do:
 
 Register an existing remote file:
 >```
