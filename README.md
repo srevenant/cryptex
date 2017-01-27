@@ -16,20 +16,20 @@ Usage varies by what you want to do:
 
 Register an existing remote file with s3:
 >```
-cryptex --config=NAME --remote=s3://key:secret@s3-bucket/filename --key=generate
+    cryptex --config=NAME --remote=s3://key:secret@s3-bucket/filename --key=generate
 ```
 
 View the latest file:
 >```
-cryptex NAME
+    cryptex NAME
 ```
 
 Edit the latest file:
 >```
-cryptex NAME --edit
+    cryptex NAME --edit
 ```
 >```
-cryptex NAME -e
+    cryptex NAME -e
 ```
 
 Also available are shortcuts: cx and vicx
