@@ -16,3 +16,5 @@ __pycache__/
 dist
 build
 cryptex.egg-info
+
+*-python3

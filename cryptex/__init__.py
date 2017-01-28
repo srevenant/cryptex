@@ -1,24 +1,32 @@
 #!/usr/bin/env python3
-# vim modeline (put ":set modeline" into your ~/.vimrc)
+#$#HEADER-START
 # vim:set expandtab ts=4 sw=4 ai ft=python:
 #
-# Cryptex manages secure documents for you, stored centrally, and versioned
-# It is used differently depending upon what you desire to do:
+#     Cryptex
 #
-# Copyright (C) 2015 Brandon Gillespie
+#     Copyright (C) 2016 Brandon Gillespie
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as published
-# by the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+#     This program is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU Affero General Public License as published
+#     by the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU Affero General Public License for more details.
 #
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#     You should have received a copy of the GNU Affero General Public License
+#     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#$#HEADER-END
+
+"""
+Cryptex - command line password and secure file management, similar to
+commercial ones, but you control the data store.
+
+Currently supports s3.
+"""
 
 import io
 import os
@@ -34,7 +42,6 @@ import time
 import base64
 import platform # for node/hostname
 import getpass # for local username
-#import StringIO
 import tempfile
 import signal
 import subprocess
@@ -54,11 +61,15 @@ class Core():
     timestamp = False
 
     ############################################################
+    # pylint: disable=invalid-name
     def TSTAMP(self):
         """Create a uniform timestamp"""
-        return time.strftime('%Y%m%d%H%M%S')
+        if self.timestamp:
+            return time.strftime('%Y%m%d%H%M%S')
+        return ""
 
     ############################################################
+    # pylint: disable=invalid-name
     def NOTICE(self, msg):
         """Internal print wrapper, so it can be easily overloaded--Notice is for human readable"""
         if self.timestamp:
@@ -67,6 +78,7 @@ class Core():
             sys.stderr.write(msg + "\n")
 
     ############################################################
+    # pylint: disable=invalid-name
     def OUTPUT(self, msg):
         """Internal print wrapper, so it can be easily overloaded--OUTPUT is for machine readable"""
         if self.timestamp:
@@ -75,6 +87,7 @@ class Core():
             sys.stdout.write(msg + "\n")
 
     ############################################################
+    # pylint: disable=invalid-name
     def DEBUG(self, msg, module="", data=None, err=None):
         """Debugging of output, supporting levels and modules"""
         debug = self.debug or {"*":False}
@@ -88,6 +101,7 @@ class Core():
                 sys.stderr.write(pprint.pformat(data, indent=1, width=80, depth=None))
 
     ############################################################
+    # pylint: disable=invalid-name
     def ABORT(self, msg, err=None):
         """standardized failure"""
         if err:
@@ -163,6 +177,7 @@ class Cipher(Core):
 
     ############################################################
     def encrypt(self, block):
+        """encrypt a given block with the loaded cipher"""
         if self.cipher == 'nacl':
             if not isinstance(block, bytes):
                 block = block.encode()
@@ -173,16 +188,18 @@ class Cipher(Core):
 
     ############################################################
     def encrypt_file(self, key, in_file, out_file):
+        """encrypt a file from file stream to file stream"""
         self.DEBUG("encrypt({k}, <in>, <out>)".format(k=key), module="Cipher")
         self._prep(key)
         out_file.write('01')
-        for block in self._read_block(in_file, self.meta['bs']):
+        for block in read_block(in_file, self.meta['bs']):
             # it comes at us base64 encoded
             out_file.write(self.encrypt(block).decode())
             out_file.write("\n")
 
     ############################################################
     def decrypt(self, block):
+        """decrypt a given block with the loaded cipher"""
         if self.cipher == 'nacl':
             data = base64.b64decode(block)
             return self.meta['cipher'].decrypt(data)
@@ -191,6 +208,7 @@ class Cipher(Core):
 
     ############################################################
     def decrypt_file(self, key, in_file, out_file):
+        """decrypt a file from file stream to file stream"""
         first = in_file.read(2)
         self._prep(key, orig=first)
         # it comes in base64 encoded, so just read "a line"
@@ -207,12 +225,13 @@ class Cipher(Core):
                     decoded = decoded.decode()
             out_file.write(decoded)
 
-    def _read_block(self, read_file, blocksize):
-        while True:
-            data = read_file.read(blocksize)
-            if not data:
-                break
-            yield data
+def read_block(read_file, blocksize):
+    """Loop through and read a file, with yield"""
+    while True:
+        data = read_file.read(blocksize)
+        if not data:
+            break
+        yield data
 
 ################################################################
 class Base(Cipher):
@@ -222,16 +241,18 @@ class Base(Cipher):
     referenced in the configuration to pull other attributes.
     """
     cx_base = os.environ['HOME'] + '/.cryptex'
-    cfg_key = None
-    cfg = {'files':{}}
+    cfg = {'__key': None, 'files':{}}
     session = str(uuid.uuid1())
+    editor = ''
+    hostname = ''
+    user = ''
 
     def __init__(self, *_, **kwargs):
 
         keyfile = self.cx_base + "/ck"
         def _load_key():
             with open(keyfile, 'rt') as in_file:
-                self.cfg_key = in_file.read()
+                self.cfg['__key'] = in_file.read()
 
         if not os.path.exists(self.cx_base):
             os.mkdir(self.cx_base, 0o700)
@@ -260,7 +281,7 @@ class Base(Cipher):
         if 'EDITOR' in os.environ.keys():
             self.editor = os.environ['EDITOR']
         else:
-            # todo: look into this being from libs
+            # TODO: look into this being from libs
             def which(cmd):
                 """search os path to find an executable"""
                 for path in os.environ["PATH"].split(os.pathsep):
@@ -272,9 +293,6 @@ class Base(Cipher):
                 if path:
                     self.editor = path
                     break
-
-
-    ############################################################
 
     ############################################################
     def __reference__(self, reference):
@@ -304,13 +322,15 @@ class Base(Cipher):
             if os.path.exists(cfgfile):
                 decrypted_file = io.BytesIO()
                 with open(cfgfile, 'rt') as in_file:
-                    self.decrypt_file(self.cfg_key, in_file, decrypted_file)
+                    key = self.cfg['__key']
+                    self.decrypt_file(key, in_file, decrypted_file)
                     decrypted_file.seek(0)
                     data = decrypted_file.read().decode()
                     self.cfg = json.loads(data)
+                    self.cfg['__key'] = key
             else:
                 self.DEBUG("No cryptex config", module='config')
-        except Exception as err:
+        except Exception as err: # pylint: disable=broad-except
             self.NOTICE("Unable to load config!")
             traceback.print_exc()
             self.DEBUG("Reason: " + str(err))
@@ -324,8 +344,8 @@ class Base(Cipher):
         decrypted_file.seek(0)
         try:
             with open(self.cx_base + "/c", 'wt') as out_file:
-                self.encrypt_file(self.cfg_key, decrypted_file, out_file)
-        except Exception as err:
+                self.encrypt_file(self.cfg['__key'], decrypted_file, out_file)
+        except Exception as err: # pylint: disable=broad-except
             self.NOTICE("Unable to save config!")
             traceback.print_exc()
             self.NOTICE("Reason: " + str(err))
@@ -337,6 +357,7 @@ class RemoteFile(Base):
     opened = None
 
     ############################################################
+    # pylint: disable=dangerous-default-value
     def __init__(self, base, debug=list()):
         """Instantiate with reference object, copy attributes"""
         super(RemoteFile, self).__init__(base, debug)
@@ -381,6 +402,8 @@ class RemoteFile(Base):
         bucket.delete_key(key_name)
 
     ############################################################
+    # TODO: refactor and simplify
+    # pylint: disable=too-many-arguments,too-many-locals,unused-argument
     def get(self, name, key_name, localfile, version=None, stdout=False, search=None):
         """Download version of file from s3 bucket"""
         self.DEBUG("get({n}, {k})".format(n=name, k=key_name), module="RemoteFile")
@@ -416,14 +439,6 @@ class RemoteFile(Base):
                     subprocess.call(['cat', gfile])
 
     ############################################################
-    # easy way to disable unlinking for debugging
-    def unlink(self, path):
-        try:
-            os.unlink(path)
-        except:
-            pass
-
-    ############################################################
     def put(self, name, localfile, force=False, lock=True):
         """
         Upload a file to s3.  Process encoding and encrypt to file
@@ -437,7 +452,7 @@ class RemoteFile(Base):
         if lock:
             try:
                 self.lock_acquire(name, force=force)
-            except Exception as err:
+            except Exception as err: # pylint: disable=broad-except
                 traceback.print_exc()
                 self.ABORT(str(err))
 
@@ -448,7 +463,7 @@ class RemoteFile(Base):
         efile = localfile + ",e"
         gfile = localfile + ".gpg"
         gpghome = self.cfg['files'][name]['gpghome']
-        self.unlink(gfile)
+        os.unlink(gfile)
         if gpghome:
             gpgkey = self.cfg['files'][name]['gpgkey']
             subprocess.call(['gpg', "--homedir", gpghome, "-r", gpgkey, "-e", localfile])
@@ -457,10 +472,10 @@ class RemoteFile(Base):
         try:
             with open(efile, 'wt') as e_fd, open(gfile) as s_fd:
                 self.encrypt_file(self.cfg['files'][name]['key'], s_fd, e_fd)
-            self.unlink(localfile)
-            self.unlink(gfile)
+            os.unlink(localfile)
+            os.unlink(gfile)
             key.set_contents_from_filename(efile, replace=False)
-        except:
+        except: # pylint: disable=broad-except
             self.lock_release(name)
             raise
         finally:
@@ -477,8 +492,8 @@ class RemoteFile(Base):
             # for now unlink everything, no local copies
             basedir = self.cx_base + '/' + name
             for file in sorted(os.listdir(basedir)):
-                self.unlink(basedir + "/" + file)
-        except Exception as err:
+                os.unlink(basedir + "/" + file)
+        except Exception as err: # pylint: disable=broad-except
             print("Failure during clean: " + str(err))
 
         #os path list | sort by age
@@ -532,7 +547,7 @@ class RemoteFile(Base):
             # also allow it if the session matches
             if len(lock) == 3 and lock[2] == self.session:
                 return True
-        except Exception:
+        except Exception: # pylint: disable=broad-except
             return self.lock_set(key)
 
         raise ValueError("File (" + target + ") is currently locked by " +
@@ -592,9 +607,9 @@ class RemoteFile(Base):
         return bucket.list(prefix=prefix)
 
     ############################################################
-    def list_names(self, name, filter=None, details=False):
+    def list_names(self, name, limit=None, details=False):
         """Return a list of remote files as names, matching file name"""
-        self.DEBUG("list_names(" + name + ", filter=" + str(filter) + ")", module="RemoteFile")
+        self.DEBUG("list_names(" + name + ", limit=" + str(limit) + ")", module="RemoteFile")
         path = self.full_path(name)
         filerx = re.compile(path + ",([0-9]{14}|[0-9_:-]{19}),.*$")
         # because other stuff could creep in and mess it up
@@ -602,7 +617,7 @@ class RemoteFile(Base):
         matched = []
         for file in self.list(name):#, prefix=name):
             if filerx.match(file.name):
-                if not filter or filter in file.name:
+                if not limit or limit in file.name:
                     if details:
                         matched.append(file)
                     else:
@@ -611,7 +626,8 @@ class RemoteFile(Base):
 
 ################################################################
 class CLI(Base):
-#
+    """Cli calls"""
+
     ############################################################
     def config_print_cli(self):
         """Print the config."""
@@ -640,6 +656,8 @@ class CLI(Base):
                 self.NOTICE(name + ": " + file)
 
     ############################################################
+    # TODO: simplify
+    # pylint: disable=too-many-arguments,too-many-branches,dangerous-default-value
     def config_cli(self, name, path=None, force=False, key=None,
                    gpghome=None, versions=None, remote=None, gpgkey=None):
         """Update / Define / Configure a file in local config"""
@@ -724,6 +742,8 @@ class CLI(Base):
         self.cfg_save()
 
     ############################################################
+    # TODO: Simplify
+    # pylint: disable=too-many-arguments,too-many-branches,dangerous-default-value, too-many-locals,too-many-statements
     def open_cli(self, name, search=list(), edit=False, editor=False, force=False, version=None):
         """Open and optionally edit a file, using latest remote version."""
         if not name in self.cfg['files'].keys():
@@ -735,13 +755,13 @@ class CLI(Base):
             self.NOTICE("Editing '" + name + "'")
             try:
                 remote.lock_acquire(name, force=force)
-            except Exception as err:
+            except Exception as err: # pylint: disable=broad-except
                 self.NOTICE(str(err))
                 self.ABORT("\nTry with --force")
         else:
             self.NOTICE("Viewing '" + name + "'")
 
-        matches = remote.list_names(name, filter=version)
+        matches = remote.list_names(name, limit=version)
         created = True
         if not matches:
             created = False
@@ -795,11 +815,14 @@ class CLI(Base):
 
 ################################################################
 def main():
+    """Entrypoint for CLI"""
     cmd = os.path.basename(__file__)
+    # pylint: disable=missing-docstring
     def help_doc():
         print(syntax())
         sys.exit(0)
 
+    # pylint: disable=missing-docstring
     def syntax():
         return '''
 Cryptex manages secure documents for you, stored centrally, and versioned

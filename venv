@@ -1,0 +1,11 @@
+#!/bin/bash
+
+v=$(hostname)-python3
+
+if [ ! -d $v ]; then
+    virtualenv --python=python3 $v
+fi
+    
+export VIRTUAL_ENV=$v
+export PATH=$v/bin:$PATH
+
